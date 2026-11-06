@@ -29,6 +29,8 @@ declare module 'claude-code' {
       remotes: string[]
       remote: string
       armed: string
+      isRepo: boolean
+      isOpen: boolean
     }
   }
 }

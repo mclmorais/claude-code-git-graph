@@ -16,6 +16,9 @@ const remotes = atom({ plugin: 'git-graph', key: 'remotes' } as const, [])
 const remote = atom({ plugin: 'git-graph', key: 'remote' } as const, '')
 // 兩段式確認中的危險動作 key
 const armed = atom({ plugin: 'git-graph', key: 'armed' } as const, '')
+// 按鈕列只在 git repo 內、pane 未開時顯示
+const isRepo = atom({ plugin: 'git-graph', key: 'isRepo' } as const, false)
+const isOpen = atom({ plugin: 'git-graph', key: 'isOpen' } as const, false)
 
 const HOVER = '#1e2230'
 const SELECTED = '#2b3245'
@@ -73,19 +76,54 @@ async function act($: EngineInterface, ok: string, args: string[]) {
   await refresh($)
 }
 
+async function openPane($: EngineInterface) {
+  // 先開：使用者指令或按鈕觸發的 open 才能在任何寬度落座，資料隨後補上
+  const opened = await $.ui.open({ id: PANE, title: 'Git Graph', focus: true, closeOnEscape: true })
+  await update($, isOpen, () => opened.isPlaced)
+  refresh($).catch(() => {})
+
+  return opened
+}
+
+// 自己的 $.ui.close 不會觸發自己的 ui.close hook，所以這裡直接清掉 isOpen
+async function closePane($: EngineInterface) {
+  await $.ui.close({ id: PANE })
+  await update($, isOpen, () => false)
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
-    await $.command.register({ name: 'git-graph', description: 'Show git graph; switch branches and add tags' })
+    // immediate: /git-graph opens the pane even while a turn is running
+    await $.command.register({ name: 'git-graph', description: 'Show git graph; switch branches and add tags', immediate: true })
+    const inRepo = await git($, ['rev-parse', '--is-inside-work-tree'])
+    await update($, isRepo, () => inRepo.exitCode === 0)
+    // a resumed session may hold a stale isOpen; the engine's pane list is the truth
+    const up = (await $.ui.panes()).some(p => p.id === PANE)
+    await update($, isOpen, () => up)
 
     return next(e)
   })
 
   on('command.run', { command: 'git-graph' }, async $ => {
-    // 先開：使用者指令觸發的 open 才能在任何寬度落座，資料隨後補上
-    const opened = await $.ui.open({ id: PANE, title: 'Git Graph', focus: true, closeOnEscape: true })
-    refresh($).catch(() => {})
+    const opened = await openPane($)
 
     return { text: opened.isPlaced ? 'Git Graph opened.' : `Git Graph not shown: ${opened.reason}` }
+  })
+
+  // the person's close mark or Escape
+  on('ui.close', async ($, e, next) => {
+    const closed = await next(e)
+    if (e.id === PANE) await update($, isOpen, () => false).catch(() => {})
+
+    return closed
+  })
+
+  // A button above the prompt that opens the pane; a press runs at once, mid-turn too
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    if (e.props.hasSurvey || !(await read($, isRepo)) || (await read($, isOpen))) return next(e)
+    const { Button } = $.ui.resolve(e)
+
+    return <Button key="open-git-graph" plain onPress={() => void openPane($)}>⎇ Git Graph</Button>
   })
 
   // Claude 跑過 git 指令後自動更新圖
@@ -358,7 +396,7 @@ export const register: Register = on => {
             <Button key="down" plain hotkey="j" onPress={() => void move(1)}>↓</Button>
             <Button key="refresh" plain hotkey="r" onPress={() => void refresh($)}>⟳</Button>
             {picked && <Button key="close" plain hotkey="x" onPress={() => void update($, selected, () => '')}>✕</Button>}
-            <Button key="quit" plain hotkey="q" onPress={() => void $.ui.close({ id: PANE })}>Close</Button>
+            <Button key="quit" plain hotkey="q" onPress={() => void closePane($)}>Close</Button>
           </Box>
         </Box>
         <Box columnGap={2} flexWrap="wrap">

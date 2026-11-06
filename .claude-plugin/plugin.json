@@ -1,6 +1,6 @@
 {
   "name": "git-graph",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A vscode-git-graph style commit graph pane for Claude Code: switch branches, checkout commits, create/rename/delete tags and push them",
   "author": {
     "name": "cainmaila",

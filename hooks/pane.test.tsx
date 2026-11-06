@@ -93,3 +93,35 @@ test('desktop clips a long subject to one line; terminal keeps it whole', async 
   expect(await terminal.find({ type: 'Text', text: /^corrigido case.*no linux$/ })).toBeDefined()
   await terminal.unmount()
 })
+
+test('the button above the prompt opens the pane, then hides while it is open', async ($, on) => {
+  on('process.run', async () => ({ value: { exitCode: 0, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }))
+  let opens = 0
+  on('ui.open', async () => { opens += 1; return { value: { isPlaced: true } as never } })
+  on('ui.toast', async () => ({ value: {} as never }))
+  on('ui.close', async () => ({ value: undefined as never }))
+  on('command.register', async () => ({ value: {} as never }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('ui.render', { component: 'AbovePrompt' }, ($, e) => {
+    const { Text } = $.ui.resolve(e)
+    return <Text>engine</Text>
+  })
+  await $.session.start({ cwd: '/repo', surface: 'desktop', isInteractive: true })
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const mount = () => $.ui.mount({ plugin: 'git-graph', surface, component: 'AbovePrompt', props: { hasSurvey: false } as never, viewport: { columns: 100, rows: 40 } })
+    const band = await mount()
+    await band.press({ key: 'open-git-graph' })
+    await band.unmount()
+    const hidden = await mount()
+    expect(await hidden.find({ key: 'open-git-graph' })).toBeUndefined()
+    await hidden.unmount()
+    // the pane's own Close button closes it, and the band comes back
+    const pane = await $.ui.mount({ plugin: 'git-graph', surface, component: 'Pane', requestId: 'git-graph', props: {} as never, viewport: { columns: 100, rows: 40 } })
+    await pane.press({ key: 'quit' })
+    await pane.unmount()
+    const back = await mount()
+    expect(await back.find({ key: 'open-git-graph' })).toBeDefined()
+    await back.unmount()
+  }
+  expect(opens).toBe(2)
+})

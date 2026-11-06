@@ -41,7 +41,7 @@ Claude edits your code and runs `git` for you, but the terminal only ever shows 
 ## Install
 
 ```sh
-claude plugin marketplace add cainmaila/claude-code-git-graph
+claude plugin marketplace add mclmorais/claude-code-git-graph
 claude plugin install git-graph@git-graph
 ```
 
@@ -52,6 +52,8 @@ Then, in any Claude Code session:
 ```
 
 Already in a session? Run `/reload-plugins` first.
+
+Inside a git repository, a **⎇ Git Graph** button also sits above the prompt. The button and `/git-graph` both open the pane at once, even while Claude is still working.
 
 ## Keys
 
@@ -80,7 +82,7 @@ Already in a session? Run `/reload-plugins` first.
 ## Development
 
 ```sh
-git clone git@github.com:cainmaila/claude-code-git-graph.git
+git clone git@github.com:mclmorais/claude-code-git-graph.git
 claude --plugin-dir ./claude-code-git-graph   # hot-reloads as you edit
 claude plugin test ./claude-code-git-graph    # lane layout + pane render tests
 claude plugin validate ./claude-code-git-graph
